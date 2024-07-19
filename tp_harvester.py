@@ -388,6 +388,9 @@ def main():
         ],
     )
     harvester = TPCollector(args.url, args.mail)
+    if harvester.language_overview is None:
+        print("Loading company url data first")
+        harvester.setup()
     harvester.save_by_language(
         args.data_path, args.language_id, limit=args.limit,
         max_pages_by_company=args.max_pages_by_company, verbose=False
