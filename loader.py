@@ -44,7 +44,7 @@ def requests_per_minute(max_calls_per_minute, logger):
             ):
                 # Calculate the time to wait until the oldest call is older than 60 seconds
                 wait_time = 60 - (now - calls[0])
-                logger.info(
+                logger.debug(
                     f"Wait {wait_time:0.2f} seconds. (Max requests per minute: {max_calls_per_minute})"
                 )
                 time.sleep(wait_time)
