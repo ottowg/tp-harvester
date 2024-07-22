@@ -32,8 +32,8 @@ Scrape jsonld review infos from TP.
 
 ## Implementation
  * The harvester loads initially all available company review urls for all languages from the pagemaps when started from command line
-   * this takes arround 6 minutes
-   * The urls are loaded on disk (currently unpacked, ~900MB)
+   * this takes around 5 minutes
+   * The urls are loaded on disk (currently unpacked, ~45MB)
    * the pagemap data is stored by default here: `sitemap_infos` (i.e. relative path)
  * A request per minute limitation is used. (60 requests per minute. Set hard coded [here](https://github.dev/ottowg/tp-harvester/blob/main/tp_harvester.md))
  * Friendly crawling is default. Please add mail adress and institutional url.
