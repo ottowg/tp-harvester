@@ -74,3 +74,9 @@ Scrape jsonld review infos from TP.
 | pt-br     | Brasil         |         26682 |
 | pt-pt     | Portugal       |         26682 |
 | sv-se     | Sverige        |         34593 |
+
+
+## Installation
+ * clone the repo
+ * install python >=3.9
+ * install requirements from `requirements.txt`
