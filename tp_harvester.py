@@ -177,7 +177,7 @@ class TPCollector:
         try:
             resp = self._get_response(url)
             if not are_effective_similar_urls(url,resp.url):
-                self.logger.warning(
+                self.logger.info(
                     f"URL: {url} was redirected to {resp.url}. Not handled. sitmap_info_wrong?"
                 )
                 resp, next_page = None, None
@@ -251,12 +251,7 @@ class TPCollector:
                 company_key = Path(url).name
                 page = json_ld_info["page"]
                 filename = f"{company_key}/{page}.json"
-                page_info_raw = json.dumps(json_ld_info)
-                data = page_info_raw.encode("utf-8")
-                fileobj = io.BytesIO(data)
-                tarinfo = tarfile.TarInfo(name=filename)
-                tarinfo.size = len(data)
-                tar.addfile(tarinfo, fileobj)
+                _add_data_to_tar(tar, json_ld_info, filename)
                 end_persist = time.time()
                 total_time = end_persist - start_total
                 time_per_page = total_time / pages_loaded
