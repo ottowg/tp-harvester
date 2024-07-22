@@ -136,9 +136,7 @@ class TPCollector:
                     resp.text.encode(), base_url=self.url_sitemap_base
                 )
                 company_urls_sub = loader.extract_company_urls(tree)
-                category_urls_sub = loader.extract_company_urls(
-                    tree, slag_pattern="/categories/"
-                )
+                category_urls_sub = loader.extract_company_urls(tree)
                 company_urls.extend(company_urls_sub)
                 category_urls.extend(category_urls_sub)
             lang_info.append(
