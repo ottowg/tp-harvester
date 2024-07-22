@@ -49,7 +49,7 @@ def requests_per_minute(max_calls_per_minute, logger):
                 )
                 time.sleep(wait_time)
                 # After waiting, clean up old calls again and proceed
-                now = time.time()
+            now = time.time()
             calls = [call for call in calls if now - call < 60]
             calls.append(now)
             return func(*args, **kwargs)
