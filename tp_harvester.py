@@ -120,8 +120,6 @@ class TPCollector:
             unit=" Languages",
         )
         for lang_id, lang in languages:
-            if lang_id != "de-de":
-                continue
             sitemap_url_base = f"{self.url_sitemap_base}/index_{lang_id}.xml"
             resp = self._get_response(sitemap_url_base)
             tree = lxml.etree.fromstring(
@@ -269,20 +267,21 @@ class TPCollector:
         print()
 
     def load_page_map_infos(self):
-        tar_file = self._get_last_page_map_info_tar_gz()
-        if tar_file is None:
+        tar_filename = self._get_last_page_map_info_tar_gz()
+        if tar_filename is None:
             self.logger.info(
                 "No language and url data found. load data with .setup() (takes ~10 minutes)."
             )
             return
+        print(tar_filename)
         today = datetime.datetime.today().strftime("%Y-%m-%d")
-        tar_file_date = tar_file.name[:-7]
+        tar_file_date = tar_filename.name[:-7]
         self.logger.info(
-            f"Load language and url data from {data_path.name} ..."
+            f"Load language and url data from {tar_file_date} ..."
         )
         if today > tar_file_date:
             self.logger.info(
-                f"language and url data might be outdated. Loaded on {data_path.name}. Reload with .setup()"
+                f"language and url data might be outdated (Loaded on {tar_file_date}. Reload with .setup()"
             )
         with tarfile.open(tar_filename, "r:gz") as tar:
             self.available_languages = _read_data_from_tar(tar, "available_languages.json")
@@ -300,11 +299,11 @@ class TPCollector:
         tar_filename = path / f"{sitemap_date}.tar.gz"
         with tarfile.open(tar_filename, "w:gz") as tar:
             filename = "available_languages.json"
-            _add_to_tar(tar, self.available_languages, filename)
+            _add_data_to_tar(tar, self.available_languages, filename)
             filename = "language_overview.json"
-            _add_to_tar(tar, filename, self.language_overview)
+            _add_data_to_tar(tar, self.language_overview, filename)
             filename = "language_company_urls.json"
-            _add_to_tar(tar, filename, self.language_company_urls)
+            _add_data_to_tar(tar, self.language_company_urls, filename)
 
     def _get_last_page_map_info_tar_gz(self):
         path = self.path_page_map_infos
@@ -315,7 +314,7 @@ class TPCollector:
         tar_files = [Path(fn) for fn in sub_folder]
         tar_files = [fn for fn in tar_files
                      if year_pattern.match(fn.name[:-7])]
-        tar_files = [fn for fn in tar_files if not f.is_dir()]
+        tar_files = [fn for fn in tar_files if not fn.is_dir()]
         if not tar_files:
             return
         tar_files.sort(key=lambda x: x.stem)
@@ -361,12 +360,12 @@ def _read_data_from_tar(tar, filename):
     data = json.loads(content)
     return data
 
-def _add_data_to_tar(tar, data, filename)        
+def _add_data_to_tar(tar, data, filename): 
     data_raw = json.dumps(data)
     data_raw_encoded = data_raw.encode("utf-8")
     fileobj = io.BytesIO(data_raw_encoded)
     tarinfo = tarfile.TarInfo(name=filename)
-    tarinfo.size = len(data)
+    tarinfo.size = len(data_raw_encoded)
     tar.addfile(tarinfo, fileobj)
 
 
