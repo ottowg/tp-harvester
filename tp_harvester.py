@@ -7,6 +7,8 @@ import io
 import random
 import argparse
 import logging
+import queue
+from collections import defaultdict
 
 from glob import glob
 from pathlib import Path
@@ -74,30 +76,55 @@ class TPCollector:
             raise Exception("Please load language infos using setup() first")
         urls = self.language_company_urls[language_id]
         random.shuffle(urls)
-        for idx, url_info in enumerate(urls):
-            params = dict(sort="recency")
+        url_queue = queue.Queue(maxsize=0)
+        if limit is not None:
+            urls = urls[:limit]
+        urls_to_load = len(urls)
+        for url_info in urls:
+            url_info["page"] = 1
+            url_queue.put(url_info)
+        urls_seen = set()
+        n_sub_pages = 0
+        n_pages_finished = 0
+        params = dict(sort="recency")
+        while not url_queue.empty():
+            url_info = url_queue.get()
             url = url_info["url"]
-            for json_ld_info in self.load_reviews_by_url(
-                url, params, max_pages_by_company=max_pages_by_company
-            ):
-                # @todo: insert date check here
+            page = url_info["page"]
+            last_mod = url_info["last_mod"]
+            response, next_page = self.get_page(url, params, page)
+            # @todo: insert date check here
+            if next_page is not None:
+                if max_pages_by_company is not None and next_page > max_pages_by_company:
+                    next_page = None
+                    self.logger.warning(
+                        f"For {url} only {page} pages are tested. Maybe there are more."
+                    )
+            if next_page is not None:
+                url_queue.put(dict(url=url, page=next_page, last_mod=last_mod))
+            if response is not None:
+                json_ld_info = self._scrape_json_ld_infos(response)
+                json_ld_info |= dict(url_base=url, page=page, url_request=url)
                 json_ld_info["url_base_last_mod"] = url_info["last_mod"]
-                yield json_ld_info
-            if idx + 1 >= limit:
-                break
+                company_key = url.split("/review/")[1]
+                json_ld_info["company_key"] = company_key
+                urls_seen.add(url)
+                n_sub_pages += 1
+                url_queue.task_done()
+                stats = dict(
+                        pages_started=len(urls_seen),
+                        pages_finished=n_pages_finished,
+                        pages_total=urls_to_load,
+                        sub_pages_loaded=n_sub_pages,
+                        language_id=language_id,
+                        current_url=url,
+                        current_page=page,
+                        len_queue=url_queue.qsize(),
+                )
+                yield json_ld_info, stats
+            if response is None or next_page is None:
+                n_pages_finished += 1
 
-    def load_reviews_by_url(self, url, params, max_pages_by_company):
-        for page_idx, response in enumerate(
-            self._page_iterator(
-                url,
-                params,
-                start_page=1,
-                max_pages_by_company=max_pages_by_company,
-            )
-        ):
-            json_ld_info = self._scrape_json_ld_infos(response)
-            json_ld_info |= dict(url_base=url, page=page_idx + 1)
-            yield json_ld_info
 
     def _get_languages(self):
         resp = self._get_response(self.url_start_page)
@@ -148,22 +175,6 @@ class TPCollector:
         )
         return lang_info, lang_company_urls
 
-    def _page_iterator(
-        self, start_url, params, start_page=1, max_pages_by_company=None
-    ):
-        """iterate over urls with increasing page attribute ("?page=1", "?page=2", ..)
-        if page is not exist: Stop
-        """
-        page = start_page
-        while page is not None:
-            if max_pages_by_company is not None and page > max_pages_by_company:
-                self.logger.warning(
-                    f"For {start_url} only {page} pages are tested. Maybe there are more."
-                )
-                break
-            response, page = self.get_page(start_url, params, page)
-            if response is not None:
-                yield response
 
     def get_page(self, url, params, page):
         next_page = page + 1
@@ -241,22 +252,16 @@ class TPCollector:
                 max_pages_by_company=max_pages_by_company,
             )
             total_urls = len(self.language_company_urls[language_id])
-            last_url = None
-            n_urls = 0
-            for pages_loaded, json_ld_info in enumerate(json_lds_iter, 1):
-                url = json_ld_info["url_base"]
-                if url != last_url:
-                    n_urls += 1
-                last_url = url
-                company_key = Path(url).name
+            for json_ld_info, stats in json_lds_iter:
                 page = json_ld_info["page"]
+                company_key = json_ld_info["company_key"]
                 filename = f"{company_key}/{page}.json"
                 _add_data_to_tar(tar, json_ld_info, filename)
                 end_persist = time.time()
                 total_time = end_persist - start_total
-                time_per_page = total_time / pages_loaded
+                time_per_page = total_time / stats["sub_pages_loaded"]
                 print(
-                    f"\rcompanies: {n_urls}/{total_urls} | total_pages: {pages_loaded} | time_total: {total_time:.0f} | one_page: {time_per_page:5.1f} | {company_key} ",
+                        f"\rcompanies: ({stats['pages_finished']}, {stats['pages_started']}, {stats['pages_total']}) | n_pages: {stats['sub_pages_loaded']} current_page_nr: {stats['current_page']} | time_total: {total_time:.0f} | one_page: {time_per_page:5.1f} | {company_key} ",
                     end="",
                 )
         print()
