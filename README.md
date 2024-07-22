@@ -52,29 +52,28 @@ Scrape jsonld review infos from TP.
 
 | lang_id   | lang           |   n_companies |
 |:----------|:---------------|--------------:|
-| da-dk     | Danmark        |        108284 |
-| de-at     | Österreich     |        108548 |
-| de-ch     | Schweiz        |        108548 |
-| de-de     | Deutschland    |        108548 |
-| en-au     | Australia      |        645734 |
-| en-ca     | Canada         |        645734 |
-| en-gb     | United Kingdom |        648212 |
-| en-ie     | Ireland        |        645734 |
-| en-nz     | New Zealand    |        645734 |
-| en-us     | United States  |        648490 |
-| es-es     | España         |         66227 |
-| fi-fi     | Suomi          |          6434 |
-| fr-be     | Belgique       |        100932 |
-| fr-fr     | France         |        100932 |
-| it-it     | Italia         |         74351 |
-| ja-jp     | 日本           |          3924 |
-| nb-no     | Norge          |          6815 |
-| nl-nl     | Nederland      |         81676 |
-| pl-pl     | Polska         |         20904 |
-| pt-br     | Brasil         |         26682 |
-| pt-pt     | Portugal       |         26682 |
-| sv-se     | Sverige        |         34593 |
-
+| da-dk     | Danmark        |        105851 |
+| de-at     | Österreich     |        106512 |
+| de-ch     | Schweiz        |        106512 |
+| de-de     | Deutschland    |        106512 |
+| en-au     | Australia      |        610810 |
+| en-ca     | Canada         |        610810 |
+| en-gb     | United Kingdom |        613287 |
+| en-ie     | Ireland        |        610810 |
+| en-nz     | New Zealand    |        610810 |
+| en-us     | United States  |        613566 |
+| es-es     | España         |         64466 |
+| fi-fi     | Suomi          |          6386 |
+| fr-be     | Belgique       |         97596 |
+| fr-fr     | France         |         97596 |
+| it-it     | Italia         |         71536 |
+| ja-jp     | 日本           |          3856 |
+| nb-no     | Norge          |          6660 |
+| nl-nl     | Nederland      |         78924 |
+| pl-pl     | Polska         |         20441 |
+| pt-br     | Brasil         |         26135 |
+| pt-pt     | Portugal       |         26135 |
+| sv-se     | Sverige        |         33422 |
 
 ## Installation
  * clone the repo
@@ -91,6 +90,11 @@ Scrape jsonld review infos from TP.
  * Not all possible sub pages for each company are loaded (limitations above (403 errors))
  * `python tp_harvester.py /data_ssds/disk01/ottowg/trustpilot de-de <mail> <harvester_url> --limit 1000`
 
+## Data Hints:
+ * Some company review pages has disambiguation subpages: 
+   * Example: "https://de.trustpilot.com/review/bigbustours.com/miami"
+   * They are treated as separate company review pages
+
 ## Known Errors
  * [ ] Not fixed 403 issue
  * [ ] URLs could be company pages without review info: 
@@ -101,3 +105,4 @@ Scrape jsonld review infos from TP.
 ## Optimizations:
  * Better handle locations  (e.g. <https://de.trustpilot.com/review/www.imocarwash.com/location/wiesbaden>)
    * Each company can have multiple location. Reviews can be location specific.
+   * Currently location is not handled
