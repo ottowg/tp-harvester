@@ -10,7 +10,7 @@ import logging
 
 from glob import glob
 from pathlib import Path
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlparse, parse_qs
 
 import requests
 import lxml
@@ -176,7 +176,7 @@ class TPCollector:
         url = f"{url}?{urlencode(params)}"
         try:
             resp = self._get_response(url)
-            if url != resp.url:
+            if not are_effective_similar_urls(url,resp.url):
                 self.logger.warning(
                     f"URL: {url} was redirected to {resp.url}. Not handled. sitmap_info_wrong?"
                 )
@@ -368,6 +368,20 @@ def _add_data_to_tar(tar, data, filename):
     tarinfo.size = len(data_raw_encoded)
     tar.addfile(tarinfo, fileobj)
 
+def are_effective_similar_urls(url, url_compare):
+    # Parse the URLs
+    parsed_url1 = urlparse(url)
+    parsed_url2 = urlparse(url_compare)
+            
+    # Extract the query parameters and sort them for comparison
+    query_params1 = parse_qs(parsed_url1.query)
+    query_params2 = parse_qs(parsed_url2.query)
+
+    # Compare the parsed URLs (excluding query parameters) and sorted query parameters
+    urls_are_same = (parsed_url1._replace(query="") == parsed_url2._replace(query="")) and (query_params1 == query_params2)
+
+    return urls_are_same
+
 
 def main():
     parser = argparse.ArgumentParser(description="Process some inputs.")
@@ -394,7 +408,7 @@ def main():
         level=logging.INFO,
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
         handlers=[
-            logging.FileHandler(f"tp_harvester_{today}.log"),  # Log to a file
+            logging.FileHandler(f"log_tp_harvester_{today}.log"),  # Log to a file
             # logging.StreamHandler()  # Log to console
         ],
     )
