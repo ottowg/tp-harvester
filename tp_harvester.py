@@ -51,7 +51,7 @@ class TPCollector:
             self.logger,
         )
         self.language_overview = None
-        self.path_page_map_infos = path_page_map_infos
+        self.path_page_map_infos = Path(path_page_map_infos)
         self.load_page_map_infos()
 
     def setup(self):
@@ -64,7 +64,6 @@ class TPCollector:
         (
             self.language_overview,
             self.language_company_urls,
-            self.language_category_urls,
         ) = _
         self._persist_page_map_infos()
 
@@ -121,6 +120,8 @@ class TPCollector:
             unit=" Languages",
         )
         for lang_id, lang in languages:
+            if lang_id != "de-de":
+                continue
             sitemap_url_base = f"{self.url_sitemap_base}/index_{lang_id}.xml"
             resp = self._get_response(sitemap_url_base)
             tree = lxml.etree.fromstring(
@@ -129,29 +130,25 @@ class TPCollector:
             # Get the sub sitmaps incl. all available page urls
             sitemap_urls = loader.extract_sitemap_urls(tree)
             company_urls = []
-            category_urls = []
             for idx, sitemap_url in enumerate(sitemap_urls):
                 resp = self._get_response(sitemap_url)
                 tree = lxml.etree.fromstring(
                     resp.text.encode(), base_url=self.url_sitemap_base
                 )
                 company_urls_sub = loader.extract_company_urls(tree)
-                category_urls_sub = loader.extract_company_urls(tree)
                 company_urls.extend(company_urls_sub)
-                category_urls.extend(category_urls_sub)
             lang_info.append(
                 dict(
                     lang_id=lang_id,
                     lang=lang,
                     n_companies=len(company_urls),
-                    n_categories=len(category_urls),
                 )
             )
             lang_company_urls[lang_id] = company_urls
         self.logger.info(
             f"Company page urls for {len(lang_info)} languages loaded."
         )
-        return lang_info, lang_company_urls, lang_category_urls
+        return lang_info, lang_company_urls
 
     def _page_iterator(
         self, start_url, params, start_page=1, max_pages_by_company=None
@@ -183,7 +180,7 @@ class TPCollector:
             resp = self._get_response(url)
             if url != resp.url:
                 self.logger.warning(
-                    f"URL: {url} was redirected to {resp.url}. Do not handle."
+                    f"URL: {url} was redirected to {resp.url}. Not handled. sitmap_info_wrong?"
                 )
                 resp, next_page = None, None
 
@@ -272,28 +269,25 @@ class TPCollector:
         print()
 
     def load_page_map_infos(self):
-        data_path = self._get_last_page_map_info_path()
-        if data_path is None:
+        tar_file = self._get_last_page_map_info_tar_gz()
+        if tar_file is None:
             self.logger.info(
-                "No language and url data found. load data with .setup() (takes ~6 minutes)."
+                "No language and url data found. load data with .setup() (takes ~10 minutes)."
             )
             return
         today = datetime.datetime.today().strftime("%Y-%m-%d")
+        tar_file_date = tar_file.name[:-7]
         self.logger.info(
             f"Load language and url data from {data_path.name} ..."
         )
-        if today > data_path.name:
+        if today > tar_file_date:
             self.logger.info(
                 f"language and url data might be outdated. Loaded on {data_path.name}. Reload with .setup()"
             )
-        with (data_path / "available_languages.json").open("r") as f:
-            self.available_languages = json.load(f)
-        with (data_path / "language_overview.json").open("r") as f:
-            self.language_overview = json.load(f)
-        with (data_path / "language_company_urls.json").open("r") as f:
-            self.language_company_urls = json.load(f)
-        with (data_path / "language_category_urls.json").open("r") as f:
-            self.language_category_urls = json.load(f)
+        with tarfile.open(tar_filename, "r:gz") as tar:
+            self.available_languages = _read_data_from_tar(tar, "available_languages.json")
+            self.language_overview = _read_data_from_tar(tar, "language_overview.json")
+            self.language_company_urls = _read_data_from_tar(tar, "language_company_urls.json")
         self.logger.info(
             f"Load language and url data for {len(self.language_overview)} languages."
         )
@@ -302,34 +296,31 @@ class TPCollector:
         self.logger.info("Persist language and url infos.")
         path = self.path_page_map_infos
         sitemap_date = datetime.datetime.today().strftime("%Y-%m-%d")
-        path = path / sitemap_date
         path.mkdir(parents=True, exist_ok=True)
-        with (path / "available_languages.json").open("w") as f:
-            json.dump(self.available_languages, f)
-        with (path / "language_overview.json").open("w") as f:
-            json.dump(self.language_overview, f)
-        with (path / "language_company_urls.json").open("w") as f:
-            json.dump(self.language_company_urls, f)
-        with (path / "language_category_urls.json").open("w") as f:
-            json.dump(self.language_category_urls, f)
+        tar_filename = path / f"{sitemap_date}.tar.gz"
+        with tarfile.open(tar_filename, "w:gz") as tar:
+            filename = "available_languages.json"
+            _add_to_tar(tar, self.available_languages, filename)
+            filename = "language_overview.json"
+            _add_to_tar(tar, filename, self.language_overview)
+            filename = "language_company_urls.json"
+            _add_to_tar(tar, filename, self.language_company_urls)
 
-    def _get_last_page_map_info_path(self):
+    def _get_last_page_map_info_tar_gz(self):
         path = self.path_page_map_infos
-        sub_folder = glob(f"{str(path)}/*")
-        ends_with_year_pattern = re.compile(
-            r".*[0-9]{4,4}-[0-9]{2,2}-[0-9]{2,2}$"
+        sub_folder = glob(f"{str(path)}/*.tar.gz")
+        year_pattern = re.compile(
+            r"^[0-9]{4,4}-[0-9]{2,2}-[0-9]{2,2}$"
         )
-        sub_folders = [
-            Path(folder)
-            for folder in sub_folder
-            if ends_with_year_pattern.search(folder)
-        ]
-        sub_folders = [f for f in sub_folders if f.is_dir()]
-        if not sub_folders:
+        tar_files = [Path(fn) for fn in sub_folder]
+        tar_files = [fn for fn in tar_files
+                     if year_pattern.match(fn.name[:-7])]
+        tar_files = [fn for fn in tar_files if not f.is_dir()]
+        if not tar_files:
             return
-        sub_folders.sort(key=lambda x: x.name)
-        last_folder = sub_folders[-1]
-        return last_folder
+        tar_files.sort(key=lambda x: x.stem)
+        last_tar_file = tar_files[-1]
+        return last_tar_file
 
 
 def utc_timestamp():
@@ -362,6 +353,23 @@ class Waiter:
             if self.verbose:
                 print("\r" + 50 * " ", end="")
                 print("\r", end="")
+
+def _read_data_from_tar(tar, filename):
+    file = tar.extractfile(filename)
+    content_binary = file.read()
+    content = content_binary.decode('utf-8')
+    data = json.loads(content)
+    return data
+
+def _add_data_to_tar(tar, data, filename)        
+    data_raw = json.dumps(data)
+    data_raw_encoded = data_raw.encode("utf-8")
+    fileobj = io.BytesIO(data_raw_encoded)
+    tarinfo = tarfile.TarInfo(name=filename)
+    tarinfo.size = len(data)
+    tar.addfile(tarinfo, fileobj)
+
+
 def main():
     parser = argparse.ArgumentParser(description="Process some inputs.")
     
@@ -402,3 +410,5 @@ def main():
 
 if __name__ == "__main__":
 	main()
+
+
