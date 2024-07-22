@@ -69,7 +69,8 @@ def extract_sitemap_urls(tree):
     return sitemap_urls
 
 
-def extract_company_urls(tree, slag_pattern="/review/"):
+def extract_company_urls(tree):
+    slag_pattern="/review/"
     """extract all company urls from a sitemap url
     Extraction is based on sitmap xml format.
     """
@@ -83,6 +84,14 @@ def extract_company_urls(tree, slag_pattern="/review/"):
         last_mod = None
         if last_mod_elements:
             last_mod = last_mod_elements[0].text
-        if slag_pattern in url:
-            url_infos.append(dict(url=url, last_mod=last_mod))
+        if "/location/" in url:
+            # do not use concrete locations of companies
+            continue
+        if url.endswith("location"):
+            # do not use location overviews of companies
+            continue
+        if "/review/" not in url:
+            # do only use urls with review (company review pages)
+            continue
+        url_infos.append(dict(url=url, last_mod=last_mod))
     return url_infos

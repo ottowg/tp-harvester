@@ -6,7 +6,7 @@ Scrape jsonld review infos from TP.
    * The review pages incl. 20 Reviews
    * The review pages of one company can be iterated with the `page` parameter in the URL
      * Example: "../reviews/<company_name>&page=3
-   * The reviews are present as structured data in the html pages (i.e. the content in the <script type="ld+json"> Tag in the header.)
+   * The reviews are present as structured data in the html pages (i.e. the content in the <script type="application/ld+json"> Tag in the header.)
  * All company pages are listed in the sitemap pages (used to support for search indexer (e.g. google))
    * Example: Sitemap: https://sitemaps.<tp_url>/index_en-us.xml
    * Lists for all available languages exist
@@ -80,3 +80,24 @@ Scrape jsonld review infos from TP.
  * clone the repo
  * install python >=3.9
  * install requirements from `requirements.txt`
+
+## Test run
+ * language_id de-de
+ * 1000 company page urls (randomly chosen)
+ * 5767 sub pages
+   * 60.478 Reviews
+ * ~2h runtime
+ * => 115340 Reviews from 1000 companies
+ * Not all possible sub pages for each company are loaded (limitations above (403 errors))
+ * `python tp_harvester.py /data_ssds/disk01/ottowg/trustpilot de-de <mail> <harvester_url> --limit 1000`
+
+## Known Errors
+ * [ ] Not fixed 403 issue
+ * [ ] URLs could be company pages without review info: 
+   * e.g. <https://de.trustpilot.com/review/www.puregym.com/location?sort=recency>
+   * Solution: better filter for sitemapt URLs
+
+
+## Optimizations:
+ * Better handle locations  (e.g. <https://de.trustpilot.com/review/www.imocarwash.com/location/wiesbaden>)
+   * Each company can have multiple location. Reviews can be location specific.

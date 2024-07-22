@@ -180,9 +180,15 @@ class TPCollector:
         ):  # if a parameter page=1 exits, the request is forwarded to the page without any paramter. Other parameters like "sort=recency" are not handled anymore.
             del params["page"]
         resp = None
+        url = f"{url}?{urlencode(params)}"
         try:
-            url = f"{url}?{urlencode(params)}"
             resp = self._get_response(url)
+            if url != resp.url:
+                self.logger.warning(
+                    f"URL: {url} was redirected to {resp.url}. Do not handle."
+                )
+                resp, next_page = None, None
+
         except HTTPError as e:
             # page with this page number does not exist. break
             if e.response.status_code == 404:
@@ -206,7 +212,7 @@ class TPCollector:
 
     def _scrape_json_ld_infos(self, response):
         json_ld_info = dict(
-            url=response.url,
+            url_response=response.url,
             date=utc_timestamp(),
             headers=dict(response.headers),
         )
@@ -241,7 +247,7 @@ class TPCollector:
                 limit=limit,
                 max_pages_by_company=max_pages_by_company,
             )
-            total_urls = len(self.language_company_urls["da-dk"])
+            total_urls = len(self.language_company_urls[language_id])
             last_url = None
             n_urls = 0
             for pages_loaded, json_ld_info in enumerate(json_lds_iter, 1):

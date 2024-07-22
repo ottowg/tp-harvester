@@ -25,7 +25,9 @@ XPATH_JSONLD = "/html/head/script[@type='application/ld+json']"
 
 def jsonld(tree):
     json_ld_elements = tree.xpath(XPATH_JSONLD)
-    if len(json_ld_elements) > 0:
-        json_ld_content_raw = json_ld_elements[0].text_content()
+    json_ld_contents = []
+    for json_ld_element in json_ld_elements:
+        json_ld_content_raw = json_ld_element.text_content()
         json_ld_content = json.loads(json_ld_content_raw)
-        return json_ld_content
+        json_ld_contents.append(json_ld_content)
+    return json_ld_contents
