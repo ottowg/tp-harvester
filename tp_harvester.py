@@ -171,7 +171,7 @@ class TPCollector:
                         current_page=page,
                         len_queue=url_queue.qsize(),
                 )
-                yield pge_data_info, stats
+                yield page_data_info, stats
             if response is None or next_page is None:
                 n_pages_finished += 1
 
@@ -214,7 +214,7 @@ class TPCollector:
             self.logger.error(f"Request failed for {url}: {e}")
         return resp, next_page
 
-    def _scrape_strucutured_infos(self, response):
+    def _scrape_structured_infos(self, response):
         structured_infos = dict(
             url_response=response.url,
             date=utc_timestamp(),
