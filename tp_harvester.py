@@ -384,11 +384,11 @@ def main():
         level=logging.INFO,
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
         handlers=[
-            logging.FileHandler(f"log_tp_harvester_{today}.log"),  # Log to a file
+            logging.FileHandler(f"{args.data_path}/log_tp_harvester_{today}.log"),  # Log to a file
             # logging.StreamHandler()  # Log to console
         ],
     )
-    harvester = TPCollector(args.url, args.mail)
+    harvester = TPCollector(args.url, args.mail, args.data_path)
     if harvester.language_overview is None:
         print("Loading company url data first")
         harvester.setup()
