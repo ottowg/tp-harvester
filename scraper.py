@@ -21,7 +21,7 @@ def languages(root_start_page):
 
 
 XPATH_JSONLD = "/html/head/script[@type='application/ld+json']"
-
+XPATH_STRUCTURED_CONTENT = "//*[@id='__NEXT_DATA__']"
 
 def jsonld(tree):
     json_ld_elements = tree.xpath(XPATH_JSONLD)
@@ -31,3 +31,15 @@ def jsonld(tree):
         json_ld_content = json.loads(json_ld_content_raw)
         json_ld_contents.append(json_ld_content)
     return json_ld_contents
+
+
+def structured_content_data(tree):
+    json_elements = tree.xpath(XPATH_STRUCTURED_CONTENT)
+    json_content = None
+    if json_elements:
+        assert len(json_elements) == 1
+        json_element = json_elements[0]
+        json_content_raw = json_element.text_content()
+        json_content = json.loads(json_content_raw)
+    return json_content
+
