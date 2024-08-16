@@ -56,7 +56,7 @@ class TPCollector:
         self.path_page_map_infos = Path(path_page_map_infos)
         self.load_page_map_infos()
 
-    def setup(self):
+    def download_page_map_infos(self):
         """Load Metadata
         * Available languages
         * Company Pages per language
@@ -120,11 +120,16 @@ class TPCollector:
 
 
     def load_reviews_by_lang(
-        self, language_id, limit=None, max_pages_by_company=None
+        self, language_id, limit=None, max_pages_by_company=None,
+        allowed_business_unit_identifiers=None
     ):
         if self.language_overview is None:
-            raise Exception("Please load language infos using setup() first")
+            raise Exception("Please load language infos using load_page_infos() first")
         urls = self.language_company_urls[language_id]
+        if allowed_business_unit_identifiers is not None:
+            # filter businessunits
+            urls = self._filter_urls(urls, allowed_business_unit_identifiers)
+            urls = list(urls)
         random.shuffle(urls)
         url_queue = queue.Queue(maxsize=0)
         if limit is not None:
@@ -175,6 +180,15 @@ class TPCollector:
             if response is None or next_page is None:
                 n_pages_finished += 1
 
+    def _filter_urls(self, urls, business_unit_identifiers):
+        """ filter out all urls, where the business_unit_identifier
+            is not in business_unit_identifiers
+        """
+        business_unit_identifiers = set(business_unit_identifiers)
+        for url in urls:
+            business_unit_identifier = url["url"].split("/")[-1]
+            if business_unit_identifier in business_unit_identifiers:
+                yield url
 
     def get_page(self, url, params, page):
         next_page = page + 1
@@ -230,6 +244,7 @@ class TPCollector:
         base_path,
         language_id,
         limit=None,
+        allowed_business_unit_identifiers=None,
         max_pages_by_company=None,
         min_year_mod=None,
         verbose=False,
@@ -249,6 +264,7 @@ class TPCollector:
             start_total = time.time()
             json_lds_iter = self.load_reviews_by_lang(
                 language_id,
+                allowed_business_unit_identifiers=allowed_business_unit_identifiers,
                 limit=limit,
                 max_pages_by_company=max_pages_by_company,
             )
@@ -271,7 +287,7 @@ class TPCollector:
         tar_filename = self._get_last_page_map_info_tar_gz()
         if tar_filename is None:
             self.logger.info(
-                "No language and url data found. load data with .setup() (takes ~10 minutes)."
+                "No language and url data found. load data with download_page_map_infos() (takes ~10 minutes)."
             )
             return
         print(tar_filename)
@@ -282,7 +298,7 @@ class TPCollector:
         )
         if today > tar_file_date:
             self.logger.info(
-                f"language and url data might be outdated (Loaded on {tar_file_date}. Reload with .setup()"
+                f"language and url data might be outdated (Loaded on {tar_file_date}. Reload with .download_page_map_infos()"
             )
         with tarfile.open(tar_filename, "r:gz") as tar:
             self.available_languages = _read_data_from_tar(tar, "available_languages.json")
@@ -359,15 +375,60 @@ def are_effective_similar_urls(url, url_compare):
     return urls_are_same
 
 
-def main():
+def harvest_business_units():
     parser = argparse.ArgumentParser(description="Process some inputs.")
     
     # Define the obligatory parameters
    
+    parser.add_argument("business_unit_name_filename", type=str, help="Name of json file with businessnames")
     parser.add_argument("data_path", type=str, help="The path where you want to store the harvested data.")
     parser.add_argument("language_id", type=str, help="language id for harvesting.")
     parser.add_argument("mail", type=str, help="Your email address (friendly crawling).")
     parser.add_argument("url", type=str, help="The URL of your institution (friendly crawling).")
+    parser.add_argument("--limit", type=int, help="An optional limit of companies to crawl for the language.", default=None)
+    parser.add_argument("--max_pages_by_company", type=int, help="An optional limit of pages to harvest for each company.", default=None)
+    
+    # Parse the arguments
+    args = parser.parse_args()
+    
+    # Access the parameters
+    import logging
+    today = datetime.datetime.today().strftime("%Y-%m-%d")
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        handlers=[
+            logging.FileHandler(f"{args.data_path}/log_tp_harvester_{today}.log"),  # Log to a file
+            # logging.StreamHandler()  # Log to console
+        ],
+    )
+    harvester = TPCollector(args.url, args.mail, args.data_path)
+    if harvester.language_overview is None:
+        print("Loading company url data first")
+        harvester.download_page_map_infos()
+    harvester.save_by_language(
+        args.data_path, args.language_id, limit=args.limit,
+        max_pages_by_company=args.max_pages_by_company, verbose=False
+    )
+    with open(args.business_unit_name_filename, "r") as f:
+        business_unit_names = json.load(f)
+    harvester.save_by_business_unit_names(
+        business_unit_names,
+        args.data_path, args.language_id, limit=args.limit,
+        max_pages_by_company=args.max_pages_by_company, verbose=False
+    )
+
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Process some inputs.")
+    
+    # Define the obligatory parameters
+    parser.add_argument("data_path", type=str, help="The path where you want to store the harvested data.")
+    parser.add_argument("language_id", type=str, help="language id for harvesting.")
+    parser.add_argument("mail", type=str, help="Your email address (friendly crawling).")
+    parser.add_argument("url", type=str, help="The URL of your institution (friendly crawling).")
+    parser.add_argument("--allowed-business-unit-identifiers", type=str, help="Only load specific reviews by business unit identifier (e.g., www.otto.de) Add a filename here to a text file. Every line is one allowed company name. If not given ALL business units are loaded.", default=None)
     parser.add_argument("--limit", type=int, help="An optional limit of companies to crawl for the language.", default=None)
     parser.add_argument("--max_pages_by_company", type=int, help="An optional limit of pages to harvest for each company.", default=None)
     
@@ -388,16 +449,19 @@ def main():
             # logging.StreamHandler()  # Log to console
         ],
     )
+    allowed_business_unit_identifiers = None
+    if args.allowed_business_unit_identifiers is not None:
+        with open(args.allowed_business_unit_identifiers, "r") as f:
+            allowed_business_unit_identifiers = f.read().strip().split("\n")
     harvester = TPCollector(args.url, args.mail, args.data_path)
     if harvester.language_overview is None:
         print("Loading company url data first")
-        harvester.setup()
+        harvester.download_page_map_infos()
     harvester.save_by_language(
         args.data_path, args.language_id, limit=args.limit,
+        allowed_business_unit_identifiers=allowed_business_unit_identifiers,
         max_pages_by_company=args.max_pages_by_company, verbose=False
     )
 
 if __name__ == "__main__":
 	main()
-
-
